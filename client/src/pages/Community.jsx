@@ -1,13 +1,27 @@
 import React, { useEffect, useState } from "react";
-import { dummyPublishedImages } from "../assets/assets";
+
 import Loading from "./Loading";
+import { useAppContext } from "../context/AppContext";
+import toast from "react-hot-toast";
 
 function Community() {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { axios, token } = useAppContext();
 
   const fetchImages = async () => {
-    setImages(dummyPublishedImages);
+    try {
+      const { data } = await axios.get("/api/user/published-images", {
+        headers: { Authorization: token },
+      });
+      if (data.success) {
+        setImages(data.images);
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
     setLoading(false);
   };
   useEffect(() => {
@@ -20,7 +34,7 @@ function Community() {
       <h2 className="text-2xl font-semibold mb-6 text-gray-800 dark:text-purple-100">
         Community Images
       </h2>
-      {images.length > 0 ? (
+      {images?.length > 0 ? (
         <div className="flex flex-wrap max-sm:justify-center gap-5">
           {images.map((item, index) => (
             <a
@@ -30,7 +44,7 @@ function Community() {
               className="relative group block rounde-lg overflow-hidden border border-gray-200 dark:border-purple-700 shadow-sm hover:shadow-md transition-shadow duration-300"
             >
               <img
-                src={item.imageUrl}
+                src={item?.imageUrl}
                 alt=""
                 className="w-full h-40 md:h-50 2xl:h-62 object-cover group-hover:scale-95 transition-transform duration-300 ease-in-out"
               />

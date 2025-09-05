@@ -34,7 +34,7 @@ export const getChats = async (req, res) => {
     const chats = await Chat.find({ userId }).sort({ updatedAt: -1 });
     return res.json({
       success: true,
-      message: chats,
+      chats,
     });
   } catch (error) {
     return res.json({

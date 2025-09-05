@@ -2,10 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 import { useAppContext } from "../context/AppContext";
 import { assets } from "../assets/assets";
 import Message from "./Message";
+import toast from "react-hot-toast";
 
 function ChatBox() {
   const containerRef = useRef(null);
-  const { selectedChat, theme } = useAppContext();
+  const { selectedChat, theme, user, axios, token, setUser } = useAppContext();
+
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [prompt, setPrompt] = useState("");
@@ -14,14 +16,62 @@ function ChatBox() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+
+    if (!user) return toast.error("Login to send message");
+    if (!selectedChat) return toast.error("No chat selected");
+
+    setLoading(true);
+    const promptCopy = prompt;
+
+    // add user msg immediately
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: prompt, timestamp: Date.now(), isImage: false },
+    ]);
+    setPrompt("");
+
+    try {
+      const { data } = await axios.post(
+        `/api/message/${mode}`,
+        { chatId: selectedChat._id, prompt, isPublished: published },
+        { headers: { Authorization: token } }
+      );
+
+      if (data.success) {
+        const replyMsgs = Array.isArray(data.reply) ? data.reply : [data.reply];
+        setMessages((prev) => [...prev, ...replyMsgs]);
+
+        // decrease credits safely
+        setUser((prev) =>
+          prev
+            ? {
+                ...prev,
+                credits: prev.credits - (mode === "image" ? 2 : 1),
+              }
+            : prev
+        );
+      } else {
+        toast.error(data.message);
+        setPrompt(promptCopy); // restore prompt
+      }
+    } catch (error) {
+      toast.error(error.message);
+      setPrompt(promptCopy); // restore prompt on error
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // load messages when selectedChat changes
   useEffect(() => {
     if (selectedChat) {
-      setMessages(selectedChat.messages);
+      setMessages(selectedChat.messages || []);
+    } else {
+      setMessages([]);
     }
   }, [selectedChat]);
 
+  // auto scroll to bottom
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTo({
@@ -42,7 +92,7 @@ function ChatBox() {
           <div className="h-full flex flex-col items-center justify-center gap-3 text-primary">
             <img
               src={theme === "dark" ? assets.logo_full : assets.logo_full_dark}
-              alt=""
+              alt="logo"
               className="w-full max-w-56 sm:max-w-72"
             />
             <p className="mt-4 text-2xl sm:text-4xl text-center text-gray-400 dark:text-white">
@@ -50,6 +100,7 @@ function ChatBox() {
             </p>
           </div>
         )}
+
         {messages.map((message, index) => (
           <Message key={index} message={message} />
         ))}
@@ -107,7 +158,7 @@ function ChatBox() {
         >
           <img
             src={loading ? assets.stop_icon : assets.send_icon}
-            alt=""
+            alt="send"
             className="w-5 invert dark:invert-0"
           />
         </button>

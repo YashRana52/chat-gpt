@@ -5,7 +5,7 @@ const plans = [
   {
     _id: "basic",
     name: "Basic",
-    price: 10,
+    price: 50,
     credits: 100,
     features: [
       "100 text generations",
@@ -17,7 +17,7 @@ const plans = [
   {
     _id: "pro",
     name: "Pro",
-    price: 20,
+    price: 100,
     credits: 500,
     features: [
       "500 text generations",
@@ -30,7 +30,7 @@ const plans = [
   {
     _id: "premium",
     name: "Premium",
-    price: 30,
+    price: 200,
     credits: 1000,
     features: [
       "1000 text generations",
@@ -42,11 +42,10 @@ const plans = [
   },
 ];
 
-//api controller to getting all plans
-
+// get all plans
 export const getPlans = async (req, res) => {
   try {
-    req.json({
+    res.json({
       success: true,
       plans,
     });
@@ -60,8 +59,7 @@ export const getPlans = async (req, res) => {
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-//api to purchase a new plane
-
+// purchase plan
 export const purchasePlans = async (req, res) => {
   try {
     const { planId } = req.body;
@@ -72,29 +70,29 @@ export const purchasePlans = async (req, res) => {
     if (!plan) {
       return res.json({
         success: false,
-        message: "invalid plan",
+        message: "Invalid plan",
       });
     }
 
-    // Create new transation
-
-    const transation = await Transaction.create({
-      userId: userId,
+    // create new transaction
+    const transaction = await Transaction.create({
+      userId,
       planId: plan._id,
       amount: plan.price,
       credits: plan.credits,
       isPaid: false,
     });
 
-    const { origin } = req.headers;
+    const origin =
+      req.headers.origin || process.env.FRONTEND_URL || "http://localhost:5173";
 
     const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"], // ✅ FIX ADDED
       line_items: [
         {
           price_data: {
-            currency: "inr",
-            unit_amount: plan.price * 100,
-
+            currency: "usd", // use "usd" for card payments
+            unit_amount: plan.price * 100, // cents
             product_data: {
               name: plan.name,
             },
@@ -105,8 +103,11 @@ export const purchasePlans = async (req, res) => {
       mode: "payment",
       success_url: `${origin}/loading`,
       cancel_url: `${origin}`,
-      metadata: { transationId: transation._id.toString(), appId: "chat-gpt" },
-      expires_at: Math.floor(Date.now() / 1000) + 30 * 60, //Expires in 30 min
+      metadata: {
+        transactionId: transaction._id.toString(),
+        appId: "chat-gpt",
+      },
+      expires_at: Math.floor(Date.now() / 1000) + 30 * 60, // expires in 30 min
     });
 
     res.json({ success: true, url: session.url });

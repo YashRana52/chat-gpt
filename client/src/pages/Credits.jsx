@@ -1,15 +1,59 @@
 import React, { useEffect, useState } from "react";
-import { dummyPlans } from "../assets/assets";
 import Loading from "./Loading";
 import { Check } from "lucide-react";
+import { useAppContext } from "../context/AppContext";
+import toast from "react-hot-toast";
 
 function Credits() {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const { axios, token } = useAppContext();
+
   const fetchPlans = async () => {
-    setPlans(dummyPlans);
+    try {
+      const { data } = await axios.get("/api/credit/plan", {
+        headers: { Authorization: token },
+      });
+
+      console.log("📥 Plans API Response:", data);
+
+      if (data.success) {
+        setPlans(data.plans);
+      } else {
+        toast.error(data.message || "Failed to fetch plan.");
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
     setLoading(false);
+  };
+
+  const purchasePlan = async (planId) => {
+    try {
+      console.log("➡️ Sending purchase request for planId:", planId);
+
+      const { data } = await axios.post(
+        "/api/credit/purchase",
+        { planId },
+        {
+          headers: {
+            Authorization: token,
+            Origin: window.location.origin,
+          },
+        }
+      );
+
+      console.log("📥 Purchase Response:", data); // log response
+
+      if (data.success && data.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error(data.message || "No redirect URL provided.");
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
   };
 
   useEffect(() => {
@@ -20,12 +64,10 @@ function Credits() {
 
   return (
     <div className="max-w-7xl min-h-screen mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Heading */}
       <h2 className="text-4xl font-extrabold text-center mb-14 text-gray-800 dark:text-white">
         Choose Your <span className="text-purple-600">Credit Plan</span>
       </h2>
 
-      {/* Plans Grid */}
       <div className="flex flex-wrap justify-center gap-10">
         {plans.map((plan) => (
           <div
@@ -37,19 +79,16 @@ function Credits() {
                   : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
               }`}
           >
-            {/* Badge for Pro */}
             {plan._id === "pro" && (
               <span className="absolute top-3 right-3 bg-purple-600 text-white text-xs px-3 py-1 rounded-full">
                 Most Popular
               </span>
             )}
 
-            {/* Plan Name */}
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               {plan.name}
             </h3>
 
-            {/* Price */}
             <p className="text-3xl font-extrabold text-purple-600 dark:text-purple-400 mb-6">
               ${plan.price}
               <span className="text-base font-medium text-gray-600 dark:text-gray-300 ml-1">
@@ -57,7 +96,6 @@ function Credits() {
               </span>
             </p>
 
-            {/* Features */}
             <ul className="flex-1 mb-6 space-y-3 text-gray-700 dark:text-gray-300">
               {plan.features.map((feature, index) => (
                 <li key={index} className="flex items-center gap-2">
@@ -67,8 +105,15 @@ function Credits() {
               ))}
             </ul>
 
-            {/* CTA Button */}
             <button
+              onClick={() => {
+                console.log("🖱️ Selected Plan:", plan);
+                console.log("🆔 Plan ID:", plan?._id);
+
+                toast.promise(purchasePlan(plan._id), {
+                  loading: "Processing...",
+                });
+              }}
               className={`px-5 py-3 rounded-lg font-semibold transition-all
                 ${
                   plan._id === "pro"

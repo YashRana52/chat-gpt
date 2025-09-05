@@ -2,12 +2,55 @@ import { useAppContext } from "../context/AppContext";
 import React, { useState } from "react";
 import { assets } from "../assets/assets";
 import moment from "moment";
+import toast from "react-hot-toast";
 
 function Sidebar({ isMenuOpen, setIsMenuOpen }) {
-  const { chats, setSelectedChat, theme, setTheme, user, navigate } =
-    useAppContext();
+  const {
+    chats,
+    setSelectedChat,
+    theme,
+    setTheme,
+    user,
+    navigate,
+    createNewChat,
+    axios,
+    setChats,
+    fetchUsersChats,
+    setToken,
+    token,
+  } = useAppContext();
 
   const [search, setSearch] = useState("");
+
+  const Logout = () => {
+    localStorage.removeItem("token");
+    setToken(null);
+    toast.success("Logged out successfully");
+  };
+
+  const detelteChat = async (e, chatId) => {
+    try {
+      e.stopPropagation();
+      const confirm = window.confirm(
+        "Are u sure you want to delete this chat?"
+      );
+      if (!confirm) return;
+      const { data } = await axios.post(
+        "/api/chat/delete",
+        { chatId },
+        {
+          headers: { Authorization: token },
+        }
+      );
+      if (data.success) {
+        setChats((prev) => prev.filter((chat) => chat._id !== chatId));
+        await fetchUsersChats();
+        toast.success(data.message);
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
 
   return (
     <div
@@ -27,6 +70,7 @@ function Sidebar({ isMenuOpen, setIsMenuOpen }) {
 
       {/* New Chat button */}
       <button
+        onClick={createNewChat}
         className="flex justify-center items-center w-full py-2 
         bg-gradient-to-r from-purple-500 to-blue-500 
         text-white text-sm rounded-xl shadow-md 
@@ -53,7 +97,7 @@ function Sidebar({ isMenuOpen, setIsMenuOpen }) {
       </div>
 
       {/* Recent Chats */}
-      {chats.length > 0 && (
+      {chats?.length > 0 && (
         <p className="mt-5 text-sm font-semibold text-gray-600 dark:text-gray-300">
           Recent Chats
         </p>
@@ -61,9 +105,9 @@ function Sidebar({ isMenuOpen, setIsMenuOpen }) {
 
       <div className="flex-1 overflow-y-scroll mt-3 text-sm space-y-3 scrollbar-thin scrollbar-thumb-gray-400/50 scrollbar-track-transparent">
         {chats
-          .filter((chat) =>
-            chat.messages[0]
-              ? chat.messages[0].content
+          ?.filter((chat) =>
+            chat?.messages[0]
+              ? chat?.messages[0].content
                   .toLowerCase()
                   .includes(search.toLowerCase())
               : chat.name.toLowerCase().includes(search.toLowerCase())
@@ -84,7 +128,7 @@ function Sidebar({ isMenuOpen, setIsMenuOpen }) {
             >
               <div>
                 <p className="truncate font-medium">
-                  {chat.messages.length > 0
+                  {chat.messages?.length > 0
                     ? chat.messages[0].content.slice(0, 32)
                     : chat.name}
                 </p>
@@ -93,6 +137,11 @@ function Sidebar({ isMenuOpen, setIsMenuOpen }) {
                 </p>
               </div>
               <img
+                onClick={(e) =>
+                  toast.promise(detelteChat(e, chat._id), {
+                    loading: "deleting...",
+                  })
+                }
                 src={assets.bin_icon}
                 alt="delete"
                 className="hidden group-hover:block w-4 cursor-pointer opacity-60 hover:opacity-100"
@@ -175,6 +224,7 @@ function Sidebar({ isMenuOpen, setIsMenuOpen }) {
           </p>
           {user && (
             <img
+              onClick={Logout}
               src={assets.logout_icon}
               alt="logout"
               className="h-5 cursor-pointer hidden group-hover:block opacity-70 hover:opacity-100"
